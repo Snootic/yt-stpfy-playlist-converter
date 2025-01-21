@@ -1,0 +1,20 @@
+{
+  "name": "playlist-converter",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "@spotify/web-api-ts-sdk": "^1.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "yt-search": "^2.12.1"
+  },
+  "type": "module"
+}
