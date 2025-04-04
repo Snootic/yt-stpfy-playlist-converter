@@ -5,7 +5,7 @@ import destroyer from 'server-destroy';
 import url from 'url';
 import yts from 'yt-search';
 import { parseISO8601Duration, scoreTrack } from './utils.js';
-import { fs } from 'fs';
+//import { fs } from 'fs';
 
 const youtube = google.youtube("v3");
 

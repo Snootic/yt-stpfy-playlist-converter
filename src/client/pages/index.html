@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="client/css/styles.css">
+    <title>Spotify to YouTube Converter</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Spotify to YouTube Converter (and vice-versa)</h1>
+        <div class="input-group">
+            <input type="text" id="playlistUrl" placeholder="Paste the Spotify/Youtube playlist link here...">
+            <button onclick="startConversion()">Convert</button>
+        </div>
+        <div id="loading" style="display: none;">Converting playlist...</div>
+        <div id="results"></div>
+    </div>
+    <script src="client/client.js"></script>
+</body>
+</html>

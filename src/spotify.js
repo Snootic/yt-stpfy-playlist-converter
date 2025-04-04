@@ -2,9 +2,14 @@ import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { scoreTrack, parseVideoTitle } from "./utils.js";
 import { getVideoMetadata } from "./youtube.js";
 
-const api = SpotifyApi.withClientCredentials(
+const api = SpotifyApi.withUserAuthorization(
     process.env.SPOTIFY_CLIENT_ID,
-    process.env.SPOTIFY_CLIENT_SECRET
+    "https://localhost:3000/callback",
+    ["playlist-read-private",
+    "playlist-read-collaborative",
+    "playlist-modify-private",
+    "playlist-modify-public"
+    ]
 );
 
 const playlistCache = new Map()
@@ -47,9 +52,11 @@ async function getPlaylistTracks(playlistId) {
         return tracksCache.get(playlistId);
     }
 
-    console.log(`Getting tracks for playlist ${playlistId}...`);
+    console.log( await api.getAccessToken() );
 
     const playlist = await api.playlists.getPlaylist(playlistId);
+
+    console.log(`Got playlist ${playlist.name}`);
 
     playlistCache.set(playlistId, playlist);
 
@@ -101,6 +108,15 @@ async function* convertFromYoutube(youtubePlaylist) {
     }
   }
 }
+
+async function createPlaylist(tracksList, userId, createPlaylistRequest) {
+	const playlist = await api.playlists.createPlaylist(userId, createPlaylistRequest);
+	
+	console.log(playlist)
+	
+}
+
+export const createSpotifyPlaylist = createPlaylist;
 export const getSpotifyPlaylistTracks = getPlaylistTracks;
 export const convertFromYoutubeToSpotify = convertFromYoutube;
 
