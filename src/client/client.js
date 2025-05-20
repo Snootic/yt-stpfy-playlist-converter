@@ -1,3 +1,19 @@
+function checkSpotifyAccessToken() {
+    let accessToken = null;
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'accesstoken') {
+            accessToken = decodeURIComponent(value);
+            break;
+        }
+    }
+    console.log(accessToken);
+    if (accessToken === null){
+        eventSource = new EventSource(`/authSpotify`);
+    }
+}
+
 function startConversion() {
     const playlistUrl = document.getElementById('playlistUrl').value;
     const resultsDiv = document.getElementById('results');
@@ -157,3 +173,7 @@ document.addEventListener('click', (event) => {
         });
     }
 });
+
+window.onload = function(e){ 
+    checkSpotifyAccessToken()
+}

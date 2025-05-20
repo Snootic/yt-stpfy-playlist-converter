@@ -11,6 +11,12 @@ const api = SpotifyApi.withUserAuthorization(
     "playlist-modify-public"
     ]
 );
+// const userAccessToken = "";
+
+// const api = SpotifyApi.withAccessToken(
+//     process.env.SPOTIFY_CLIENT_ID,
+//     userAccessToken
+// );
 
 const playlistCache = new Map()
 const tracksCache = new Map()
@@ -54,8 +60,10 @@ async function getPlaylistTracks(playlistId) {
 
     console.log( await api.getAccessToken() );
 
-    const playlist = await api.playlists.getPlaylist(playlistId);
-
+    const playlist = await api.playlists.getPlaylist(playlistId)
+    .catch(err => {
+        console.log(err);
+    });
     console.log(`Got playlist ${playlist.name}`);
 
     playlistCache.set(playlistId, playlist);

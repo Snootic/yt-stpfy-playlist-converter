@@ -2,10 +2,14 @@ import express from 'express';
 import { convertFromYoutubeToSpotify, getSpotifyPlaylistTracks, createSpotifyPlaylist } from "./spotify.js";
 import { convertToYoutubeFromSpotify, getYoutubePlaylistTracks } from "./youtube.js";
 import dotenv from 'dotenv';
+import crypto from 'crypto';
+import querystring from 'querystring';
+import axios from 'axios';
 
 dotenv.config();
 
 const app = express();
+
 const port = 3000;
 
 app.use(express.static('src'));
@@ -21,29 +25,62 @@ const generateRandomString = (length) => {
 	return values.reduce((acc, x) => acc + possible[x % possible.length], "");
   }
 
-app.get('/auth', (req, res) => {
+app.get('/authSpotify', (req, res) => {
 
 	const clientId = process.env.SPOTIFY_CLIENT_ID;
-	const redirectUri = 'http://localhost:3000';
+	const redirectUri = process.env.REDIRECT_URL;
 
+	var state = generateRandomString(16);
 	const scope = 'user-read-private user-read-email';
-	const authUrl = new URL("https://accounts.spotify.com/authorize")
 
-	// generated in the previous step
-	window.localStorage.setItem('code_verifier', codeVerifier);
+	res.redirect('https://accounts.spotify.com/authorize?' +
+		querystring.stringify({
+			response_type: 'code',
+			client_id: client_id,
+			scope: scope,
+			redirect_uri: redirect_uri,
+			state: state
+    	})
+	);
+});
 
-	const params =  {
-	response_type: 'code',
-	client_id: clientId,
-	scope,
-	code_challenge_method: 'S256',
-	code_challenge: codeChallenge,
-	redirect_uri: redirectUri,
-	}
+app.get('/callback', async (req, res) => {
+const code = req.query.code || null;
+    const state = req.query.state || null;
+    const redirect_uri = process.env.REDIRECT_URL;
+    const client_id = process.env.SPOTIFY_CLIENT_ID;
+    const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
 
-	authUrl.search = new URLSearchParams(params).toString();
-	window.location.href = authUrl.toString();
-}); 
+    if (!code) {
+        return res.redirect('/?error=missing_code');
+    }
+
+    try {
+        const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
+            querystring.stringify({
+                code: code,
+                redirect_uri: redirect_uri,
+                grant_type: 'authorization_code'
+            }),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + Buffer.from(client_id + ':' + client_secret).toString('base64')
+                }
+            }
+        );
+
+        const { access_token, refresh_token } = tokenResponse.data;
+
+        // Store tokens in cookies (httpOnly for security)
+        res.cookie('access_token', access_token, { httpOnly: true, secure: true, sameSite: 'lax' });
+        res.cookie('refresh_token', refresh_token, { httpOnly: true, secure: true, sameSite: 'lax' });
+
+    } catch (error) {
+        console.error(error.response?.data || error.message);
+        res.redirect('/?error=token_error');
+    }
+});
 
 app.get('/convert', async (req, res) => {
     const playlistUrl = req.query.url;
