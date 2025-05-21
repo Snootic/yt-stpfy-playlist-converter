@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import querystring from 'querystring';
 import axios from 'axios';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const port = 3000;
 
 app.use(express.static('src'));
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/', (req, res) => {
 	res.sendFile('client/pages/index.html', { root: 'src' });
@@ -33,52 +35,68 @@ app.get('/authSpotify', (req, res) => {
 	var state = generateRandomString(16);
 	const scope = 'user-read-private user-read-email';
 
-	res.redirect('https://accounts.spotify.com/authorize?' +
-		querystring.stringify({
-			response_type: 'code',
-			client_id: client_id,
-			scope: scope,
-			redirect_uri: redirect_uri,
-			state: state
-    	})
-	);
+    res.redirect('https://accounts.spotify.com/authorize?' +
+        querystring.stringify({
+            response_type: 'code',
+            client_id: clientId,
+            scope: scope,
+            redirect_uri: redirectUri,
+            state: state
+        })
+    );
 });
 
 app.get('/callback', async (req, res) => {
-const code = req.query.code || null;
+    const code = req.query.code || null;
     const state = req.query.state || null;
-    const redirect_uri = process.env.REDIRECT_URL;
-    const client_id = process.env.SPOTIFY_CLIENT_ID;
-    const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
 
-    if (!code) {
-        return res.redirect('/?error=missing_code');
+    if (state === null) {
+        return res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
     }
 
     try {
-        const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
+        const tokenResponse = await axios.post(
+            'https://accounts.spotify.com/api/token',
             querystring.stringify({
                 code: code,
-                redirect_uri: redirect_uri,
+                redirect_uri: process.env.REDIRECT_URL,
                 grant_type: 'authorization_code'
             }),
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': 'Basic ' + Buffer.from(client_id + ':' + client_secret).toString('base64')
+                    'Authorization': 'Basic ' + Buffer.from(
+                        process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET
+                    ).toString('base64')
                 }
             }
         );
 
         const { access_token, refresh_token } = tokenResponse.data;
 
-        // Store tokens in cookies (httpOnly for security)
-        res.cookie('access_token', access_token, { httpOnly: true, secure: true, sameSite: 'lax' });
-        res.cookie('refresh_token', refresh_token, { httpOnly: true, secure: true, sameSite: 'lax' });
-
+        res.cookie('access_token', access_token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+        });
+        res.cookie('refresh_token', refresh_token, {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+        });
+        res.redirect('/');
     } catch (error) {
         console.error(error.response?.data || error.message);
         res.redirect('/?error=token_error');
+    }
+});
+
+app.get('/check-auth', (req, res) => {
+    const accessToken = req.cookies['access_token'];
+    if (accessToken) {
+        res.json({ authenticated: true });
+    } else {
+        res.json({ authenticated: false });
     }
 });
 

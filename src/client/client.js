@@ -1,17 +1,14 @@
 function checkSpotifyAccessToken() {
-    let accessToken = null;
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'accesstoken') {
-            accessToken = decodeURIComponent(value);
-            break;
-        }
-    }
-    console.log(accessToken);
-    if (accessToken === null){
-        eventSource = new EventSource(`/authSpotify`);
-    }
+    fetch('/check-auth')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.authenticated) {
+                window.location.href = '/authSpotify';
+            }
+        })
+        .catch(() => {
+            window.location.href = '/authSpotify';
+        });
 }
 
 function startConversion() {
