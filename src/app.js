@@ -73,11 +73,11 @@ app.get('/callback', async (req, res) => {
         );
 
         const SpotifyTokenData = JSON.stringify(tokenResponse.data);
-        // Serialize the object as JSON before setting it as a cookie
         res.cookie('SpotifyTokenData', SpotifyTokenData, {
             httpOnly: true,
             sameSite: 'lax',
             path: '/',
+            maxAge: 3600 * 1000 // expires in 1 hour (in milliseconds)
         });
         res.redirect('/');
     } catch (error) {
