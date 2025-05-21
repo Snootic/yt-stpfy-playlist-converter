@@ -72,14 +72,9 @@ app.get('/callback', async (req, res) => {
             }
         );
 
-        const { access_token, refresh_token } = tokenResponse.data;
-
-        res.cookie('access_token', access_token, {
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/',
-        });
-        res.cookie('refresh_token', refresh_token, {
+        const SpotifyTokenData = JSON.stringify(tokenResponse.data);
+        // Serialize the object as JSON before setting it as a cookie
+        res.cookie('SpotifyTokenData', SpotifyTokenData, {
             httpOnly: true,
             sameSite: 'lax',
             path: '/',
@@ -92,8 +87,9 @@ app.get('/callback', async (req, res) => {
 });
 
 app.get('/check-auth', (req, res) => {
-    const accessToken = req.cookies['access_token'];
-    if (accessToken) {
+    const spotifyTokenData = JSON.parse(req.cookies['SpotifyTokenData'] || '{}');
+    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData;
+    if (SPOTIFY_ACCESS_TOKEN) {
         res.json({ authenticated: true });
     } else {
         res.json({ authenticated: false });
@@ -111,20 +107,22 @@ app.get('/convert', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 	
+    const spotifyTokenData = JSON.parse(req.cookies['SpotifyTokenData'] || '{}');
+    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData;
     
     let clientConnected = true;	
 
     async function convertFromYoutube(playlistUrl){
 		const youtubeTracks = await getYoutubePlaylistTracks(playlistUrl);
 	
-		for await (const result of convertFromYoutubeToSpotify(youtubeTracks)) {
+		for await (const result of convertFromYoutubeToSpotify(youtubeTracks,SPOTIFY_ACCESS_TOKEN)) {
 			if (!clientConnected) break;
 			res.write(`data: ${JSON.stringify(result)}\n\n`);
 		}
     }
 
     async function convertFromSpotify(playlistUrl){
-    	const spotifyTracks = await getSpotifyPlaylistTracks(playlistUrl);
+    	const spotifyTracks = await getSpotifyPlaylistTracks(playlistUrl,SPOTIFY_ACCESS_TOKEN);
 	
 		for await (const result of convertToYoutubeFromSpotify(spotifyTracks)) {
 			if (!clientConnected) break;
@@ -156,7 +154,6 @@ app.post("/createPlaylist", async (req,res) => {
 	console.log(req.body);
 
 	const playlistLink = await createSpotifyPlaylist(req.tracksList, req.body.userId, req.body.playlist)
-
 	
 });
 

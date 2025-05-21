@@ -2,21 +2,10 @@ import { SpotifyApi } from "@spotify/web-api-ts-sdk";
 import { scoreTrack, parseVideoTitle } from "./utils.js";
 import { getVideoMetadata } from "./youtube.js";
 
-const api = SpotifyApi.withUserAuthorization(
-    process.env.SPOTIFY_CLIENT_ID,
-    "https://localhost:3000/callback",
-    ["playlist-read-private",
-    "playlist-read-collaborative",
-    "playlist-modify-private",
-    "playlist-modify-public"
-    ]
-);
-// const userAccessToken = "";
-
-// const api = SpotifyApi.withAccessToken(
-//     process.env.SPOTIFY_CLIENT_ID,
-//     userAccessToken
-// );
+function getAPI(accessToken) {
+    let api = SpotifyApi.withAccessToken(process.env.SPOTIFY_CLIENT_ID, accessToken);
+    return api
+}
 
 const playlistCache = new Map()
 const tracksCache = new Map()
@@ -48,7 +37,9 @@ async function checkMatches(spotifyTracks, videoMetadata) {
     return sortedMatches;
 }
 
-async function getPlaylistTracks(playlistId) {
+async function getPlaylistTracks(playlistId, accessToken) {
+    const api = getAPI(accessToken);
+
     if (playlistId.includes("/playlist/")) {
         playlistId = playlistIdParser(playlistId);
     }
@@ -86,7 +77,8 @@ async function getPlaylistTracks(playlistId) {
     return tracks
 }
 
-async function searchTrackFromYoutube(videoMetadata) {
+async function searchTrackFromYoutube(videoMetadata, accessToken) {
+    const api = getAPI(accessToken);
     const query = parseVideoTitle(videoMetadata.title);
     // console.log(query)
     const search = await api.search(query, 'track', null, 20);
@@ -96,32 +88,33 @@ async function searchTrackFromYoutube(videoMetadata) {
     return tracks;
 }
 
-async function* convertFromYoutube(youtubePlaylist) {
-  for (const video of youtubePlaylist) {
-    const videoMetadata = await getVideoMetadata(video);
-    const tracks = await searchTrackFromYoutube(videoMetadata);
-    const matches = await checkMatches(tracks, videoMetadata);
+async function* convertFromYoutube(youtubePlaylist, accessToken) {
+    const api = getAPI(accessToken);
+    for (const video of youtubePlaylist) {
+        const videoMetadata = await getVideoMetadata(video);
+        const tracks = await searchTrackFromYoutube(videoMetadata, accessToken);
+        const matches = await checkMatches(tracks, videoMetadata);
 
-    if (matches.length > 0) {
-      const bestMatch = matches[0][0];
+        if (matches.length > 0) {
+        const bestMatch = matches[0][0];
 
-    //   console.log(`Match found for ${videoMetadata.author.name} - ${videoMetadata.title}: ${bestMatch.name} - ${bestMatch.external_urls.spotify} with score ${matches[0][1].totalScore}`);
-    //   console.log(`Other matches: ${matches.slice(1).map((match) => `${match[0].name} - ${match[0].external_urls.spotify} with score ${match[1].totalScore}\n`)}`);
-      
-      yield { videoMetadata, bestMatch, matches };
-    } else {
-    //   console.log(`No match found for ${videoMetadata.author.name} - ${videoMetadata.title}`);
-      
-      yield { videoMetadata, bestMatch: null, matches: [] };
-    }
+        //   console.log(`Match found for ${videoMetadata.author.name} - ${videoMetadata.title}: ${bestMatch.name} - ${bestMatch.external_urls.spotify} with score ${matches[0][1].totalScore}`);
+        //   console.log(`Other matches: ${matches.slice(1).map((match) => `${match[0].name} - ${match[0].external_urls.spotify} with score ${match[1].totalScore}\n`)}`);
+        
+        yield { videoMetadata, bestMatch, matches };
+        } else {
+        //   console.log(`No match found for ${videoMetadata.author.name} - ${videoMetadata.title}`);
+        
+        yield { videoMetadata, bestMatch: null, matches: [] };
+        }
   }
 }
 
-async function createPlaylist(tracksList, userId, createPlaylistRequest) {
+async function createPlaylist(tracksList, userId, createPlaylistRequest, accessToken) {
+    const api = getAPI(accessToken);
 	const playlist = await api.playlists.createPlaylist(userId, createPlaylistRequest);
 	
 	console.log(playlist)
-	
 }
 
 export const createSpotifyPlaylist = createPlaylist;
