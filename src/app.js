@@ -88,7 +88,7 @@ app.get('/callback', async (req, res) => {
 
 app.get('/check-auth', (req, res) => {
     const spotifyTokenData = JSON.parse(req.cookies['SpotifyTokenData'] || '{}');
-    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData;
+    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData.access_token;
     if (SPOTIFY_ACCESS_TOKEN) {
         res.json({ authenticated: true });
     } else {
