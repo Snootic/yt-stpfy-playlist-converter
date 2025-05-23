@@ -2,14 +2,20 @@ import express from 'express';
 import { convertFromYoutubeToSpotify, getSpotifyPlaylistTracks, createSpotifyPlaylist } from "./spotify.js";
 import { convertToYoutubeFromSpotify, getYoutubePlaylistTracks } from "./youtube.js";
 import dotenv from 'dotenv';
+import crypto from 'crypto';
+import querystring from 'querystring';
+import axios from 'axios';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
 const app = express();
+
 const port = 3000;
 
 app.use(express.static('src'));
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/', (req, res) => {
 	res.sendFile('client/pages/index.html', { root: 'src' });
@@ -21,29 +27,74 @@ const generateRandomString = (length) => {
 	return values.reduce((acc, x) => acc + possible[x % possible.length], "");
   }
 
-app.get('/auth', (req, res) => {
+app.get('/authSpotify', (req, res) => {
 
 	const clientId = process.env.SPOTIFY_CLIENT_ID;
-	const redirectUri = 'http://localhost:3000';
+	const redirectUri = process.env.REDIRECT_URL;
 
+	var state = generateRandomString(16);
 	const scope = 'user-read-private user-read-email';
-	const authUrl = new URL("https://accounts.spotify.com/authorize")
 
-	// generated in the previous step
-	window.localStorage.setItem('code_verifier', codeVerifier);
+    res.redirect('https://accounts.spotify.com/authorize?' +
+        querystring.stringify({
+            response_type: 'code',
+            client_id: clientId,
+            scope: scope,
+            redirect_uri: redirectUri,
+            state: state
+        })
+    );
+});
 
-	const params =  {
-	response_type: 'code',
-	client_id: clientId,
-	scope,
-	code_challenge_method: 'S256',
-	code_challenge: codeChallenge,
-	redirect_uri: redirectUri,
-	}
+app.get('/callback', async (req, res) => {
+    const code = req.query.code || null;
+    const state = req.query.state || null;
 
-	authUrl.search = new URLSearchParams(params).toString();
-	window.location.href = authUrl.toString();
-}); 
+    if (state === null) {
+        return res.redirect('/#' + querystring.stringify({ error: 'state_mismatch' }));
+    }
+
+    try {
+        const tokenResponse = await axios.post(
+            'https://accounts.spotify.com/api/token',
+            querystring.stringify({
+                code: code,
+                redirect_uri: process.env.REDIRECT_URL,
+                grant_type: 'authorization_code'
+            }),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + Buffer.from(
+                        process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET
+                    ).toString('base64')
+                }
+            }
+        );
+
+        const SpotifyTokenData = JSON.stringify(tokenResponse.data);
+        res.cookie('SpotifyTokenData', SpotifyTokenData, {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 3600 * 1000 // expires in 1 hour (in milliseconds)
+        });
+        res.redirect('/');
+    } catch (error) {
+        console.error(error.response?.data || error.message);
+        res.redirect('/?error=token_error');
+    }
+});
+
+app.get('/check-auth', (req, res) => {
+    const spotifyTokenData = JSON.parse(req.cookies['SpotifyTokenData'] || '{}');
+    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData.access_token;
+    if (SPOTIFY_ACCESS_TOKEN) {
+        res.json({ authenticated: true });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
 
 app.get('/convert', async (req, res) => {
     const playlistUrl = req.query.url;
@@ -56,20 +107,22 @@ app.get('/convert', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 	
+    const spotifyTokenData = JSON.parse(req.cookies['SpotifyTokenData'] || '{}');
+    const SPOTIFY_ACCESS_TOKEN = spotifyTokenData;
     
     let clientConnected = true;	
 
     async function convertFromYoutube(playlistUrl){
 		const youtubeTracks = await getYoutubePlaylistTracks(playlistUrl);
 	
-		for await (const result of convertFromYoutubeToSpotify(youtubeTracks)) {
+		for await (const result of convertFromYoutubeToSpotify(youtubeTracks,SPOTIFY_ACCESS_TOKEN)) {
 			if (!clientConnected) break;
 			res.write(`data: ${JSON.stringify(result)}\n\n`);
 		}
     }
 
     async function convertFromSpotify(playlistUrl){
-    	const spotifyTracks = await getSpotifyPlaylistTracks(playlistUrl);
+    	const spotifyTracks = await getSpotifyPlaylistTracks(playlistUrl,SPOTIFY_ACCESS_TOKEN);
 	
 		for await (const result of convertToYoutubeFromSpotify(spotifyTracks)) {
 			if (!clientConnected) break;
@@ -101,7 +154,6 @@ app.post("/createPlaylist", async (req,res) => {
 	console.log(req.body);
 
 	const playlistLink = await createSpotifyPlaylist(req.tracksList, req.body.userId, req.body.playlist)
-
 	
 });
 

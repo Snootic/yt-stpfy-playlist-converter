@@ -1,3 +1,16 @@
+function checkSpotifyAccessToken() {
+    fetch('/check-auth')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.authenticated) {
+                window.location.href = '/authSpotify';
+            }
+        })
+        .catch(() => {
+            window.location.href = '/authSpotify';
+        });
+}
+
 function startConversion() {
     const playlistUrl = document.getElementById('playlistUrl').value;
     const resultsDiv = document.getElementById('results');
@@ -157,3 +170,7 @@ document.addEventListener('click', (event) => {
         });
     }
 });
+
+window.onload = function(e){ 
+    checkSpotifyAccessToken()
+}
